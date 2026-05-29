@@ -263,16 +263,17 @@ const RenderState = struct {
             var dst = &self.rows[y];
             dst.version = src.version;
             dst.dirty = true;
-            if (dst.cells.len < cols) {
+            const row_cols = src.cells.len;
+            if (dst.cells.len != row_cols) {
                 if (dst.cells.len != 0) self.allocator.free(dst.cells);
-                dst.cells = try self.allocator.alloc(StateCell, cols);
-                self.allocation_count += 1;
+                dst.cells = if (row_cols == 0) &.{} else try self.allocator.alloc(StateCell, row_cols);
+                if (row_cols != 0) self.allocation_count += 1;
             }
-            const need_pool = cols * max_cluster_len;
-            if (dst.pool.len < need_pool) {
+            const need_pool = row_cols * max_cluster_len;
+            if (dst.pool.len != need_pool) {
                 if (dst.pool.len != 0) self.allocator.free(dst.pool);
-                dst.pool = try self.allocator.alloc(u32, need_pool);
-                self.allocation_count += 1;
+                dst.pool = if (need_pool == 0) &.{} else try self.allocator.alloc(u32, need_pool);
+                if (need_pool != 0) self.allocation_count += 1;
             }
             dst.pool_len = 0;
 
@@ -364,6 +365,40 @@ test "optimized steady state allocs zero" {
         try state.update(&screen);
     }
     try std.testing.expectEqual(before, state.allocation_count);
+}
+
+test "optimized handles column shrink and grow" {
+    const allocator = std.testing.allocator;
+    var state = RenderState.init(allocator);
+    defer state.deinit();
+
+    var wide = try Screen.initWithCluster(allocator, 6, 12, default_cluster_len);
+    defer wide.deinit();
+    try state.update(&wide);
+
+    var narrow = try Screen.initWithCluster(allocator, 6, 5, default_cluster_len);
+    defer narrow.deinit();
+    advanceFrame(&narrow, 3);
+    var narrow_allocs: usize = 0;
+    var narrow_naive = try naiveUpdate(allocator, &narrow, &narrow_allocs);
+    defer narrow_naive.deinit();
+    try state.update(&narrow);
+    try std.testing.expectEqual(narrow_naive.hash(), state.hash());
+    for (state.rows) |row| {
+        try std.testing.expectEqual(@as(usize, 5), row.cells.len);
+    }
+
+    var wider = try Screen.initWithCluster(allocator, 6, 9, default_cluster_len);
+    defer wider.deinit();
+    advanceFrame(&wider, 4);
+    var wider_allocs: usize = 0;
+    var wider_naive = try naiveUpdate(allocator, &wider, &wider_allocs);
+    defer wider_naive.deinit();
+    try state.update(&wider);
+    try std.testing.expectEqual(wider_naive.hash(), state.hash());
+    for (state.rows) |row| {
+        try std.testing.expectEqual(@as(usize, 9), row.cells.len);
+    }
 }
 
 pub fn main() !void {

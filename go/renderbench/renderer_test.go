@@ -41,6 +41,21 @@ func TestOptimizedSteadyStateAllocs(t *testing.T) {
 	}
 }
 
+func TestOptimizedFirstDirtyUpdateAllocs(t *testing.T) {
+	s := NewScreenWithCluster(benchRows, benchCols, auditClusterLen)
+	var st RenderState
+	st.Update(s)
+
+	AdvanceFrame(s, benchDirtyRows)
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	st.Update(s)
+	runtime.ReadMemStats(&after)
+	if got := after.Mallocs - before.Mallocs; got != 0 {
+		t.Fatalf("first dirty optimized update allocated: %d mallocs", got)
+	}
+}
+
 func BenchmarkNaiveClone(b *testing.B) {
 	s := NewScreenWithCluster(benchRows, benchCols, DefaultClusterLen)
 	b.ReportAllocs()

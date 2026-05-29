@@ -196,7 +196,11 @@ func (st *RenderState) Update(s *Screen) {
 				st.rowVersions[i] = 0
 			}
 		}
-		st.dirtyRows = st.dirtyRows[:0]
+		if cap(st.dirtyRows) < rows {
+			st.dirtyRows = make([]int, 0, rows)
+		} else {
+			st.dirtyRows = st.dirtyRows[:0]
+		}
 		st.RowsLen = rows
 		st.Cols = cols
 	} else {

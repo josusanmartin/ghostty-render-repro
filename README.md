@@ -19,6 +19,12 @@ frame. The optimized renderer keeps `RenderState` memory between calls and only
 rewrites rows whose versions changed. Validation hashes compare the full logical
 render output, not only dirty rows.
 
+This is a focused dirty-row retained-state model, not a reproduction of the
+full Ghostty renderer. Ghostty's current render state also accounts for
+terminal/screen dirty flags, dimensions, viewport pins, page dirty state, row
+dirty state, colors, cursor, selection, highlights, and related terminal state.
+This repo isolates the retained-state allocation/throughput issue.
+
 This mirrors the important design in Ghostty's renderer:
 
 - stateful render output instead of cloning the whole screen every frame
@@ -29,12 +35,14 @@ This mirrors the important design in Ghostty's renderer:
 ## Run
 
 ```sh
-cd /home/josu/dev/ghostty-render-repro
+git clone https://github.com/josusanmartin/ghostty-render-repro.git
+cd ghostty-render-repro
 ./tools/run_all.sh
 ```
 
-If `zig` is not on `PATH`, `tools/run_all.sh` downloads the Zig 0.16.0 Linux
-x86_64 tarball from `ziglang.org` into `.zig/`.
+If `zig` is not on `PATH`, `tools/run_all.sh` downloads the Zig 0.16.0 tarball
+for Linux/macOS on x86_64/aarch64 into `.zig/`. For other platforms, install
+Zig yourself or set `ZIG=/path/to/zig`.
 
 Individual runs:
 
@@ -80,16 +88,16 @@ problem as "150k bad allocations." The audited model is now:
 Results from `./tools/run_all.sh`:
 
 ```text
-Go naive render-only:        68-85 ms, 161002 allocs/op
-Go optimized render-only:    14.5-15.0 us, 0 allocs/op
-Go optimized incl mutation:  20.5-20.7 us, 0 allocs/op
+Go naive render-only:        74-77 ms, 161002 allocs/op
+Go optimized render-only:    14.6-15.5 us, 0 allocs/op
+Go optimized incl mutation:  20.9-21.8 us, 0 allocs/op
 
-Rust naive render-only:      96.5 ms, 161001 allocs/frame
-Rust optimized render-only:  4.9 us, 0 allocs/frame
+Rust naive render-only:      95.9 ms, 161001 allocs/frame
+Rust optimized render-only:  5.1 us, 0 allocs/frame
 Rust optimized incl mutation: 7.4 us, 0 allocs/frame
 
-Zig optimized render-only:   6.5 us, 0 logical allocs/frame
-Zig optimized incl mutation: 9.5 us, 0 logical allocs/frame
+Zig optimized render-only:   7.6 us, 0 logical allocs/frame
+Zig optimized incl mutation: 10.7 us, 0 logical allocs/frame
 ```
 
 Zig's naive baseline is much faster because its allocator path does not zero
