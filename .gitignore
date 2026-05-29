@@ -1,0 +1,6 @@
+.zig/
+rust/target/
+go/*.test
+*.prof
+*.pprof
+
