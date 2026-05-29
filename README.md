@@ -104,24 +104,6 @@ Key files:
 - `zig/src/main.zig`
 - `README.md`
 
-## Agent Prompt Log
-
-This section records the user-facing prompts that drove this reproduction. The
-agent/tooling used for this repo does not expose hidden reasoning traces or a
-measured internal "reasoning time" field, so that value is listed as not
-available. The measured benchmark/runtime data is reported in the results above.
-
-| # | Prompt | Reasoning time |
-|---|--------|----------------|
-| 1 | Replicate the renderer optimization problem, avoid exploits, and find solutions in Zig, Rust, and Go. | Not available |
-| 2 | Check whether the initial 88 ms and 150k allocation baseline was replicated. | Not available |
-| 3 | Audit the benchmarking, first reproduce the naive 88 ms result, then measure the optimized renderer. | Not available |
-| 4 | Optimize the implementation to reach sub-20us. | Not available |
-| 5 | Publish the code as three separate gists. | Not available |
-| 6 | Move everything into a GitHub repository. | Not available |
-| 7 | Add the benchmark results and audit correction to this README. | Not available |
-| 8 | Add a prompt log and the reasoning time used by the agent. | Not available |
-
 ## What to look for
 
 The steady-state optimized update should report zero allocations after warmup.
