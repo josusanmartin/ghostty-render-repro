@@ -49,8 +49,8 @@ Individual runs:
 ```sh
 cd go && go test ./... -run '^$' -bench='OptimizedSteadyAudit88ms' -benchmem -benchtime=1000x -count=3
 cd rust && cargo test --release && cargo run --release
-.zig/zig test zig/src/main.zig -O ReleaseFast
-.zig/zig run zig/src/main.zig -O ReleaseFast
+zig test zig/src/main.zig -O ReleaseFast
+zig run zig/src/main.zig -O ReleaseFast
 ```
 
 ## Audited Workload
@@ -88,16 +88,16 @@ problem as "150k bad allocations." The audited model is now:
 Results from `./tools/run_all.sh`:
 
 ```text
-Go naive render-only:        74-77 ms, 161002 allocs/op
-Go optimized render-only:    14.6-15.5 us, 0 allocs/op
-Go optimized incl mutation:  20.9-21.8 us, 0 allocs/op
+Go naive render-only:        69-80 ms, 161002 allocs/op
+Go optimized render-only:    14.6-14.9 us, 0 allocs/op
+Go optimized incl mutation:  19.4-21.4 us, 0 allocs/op
 
-Rust naive render-only:      95.9 ms, 161001 allocs/frame
-Rust optimized render-only:  5.1 us, 0 allocs/frame
-Rust optimized incl mutation: 7.4 us, 0 allocs/frame
+Rust naive render-only:      96.9 ms, 161001 allocs/frame
+Rust optimized render-only:  5.2 us, 0 allocs/frame
+Rust optimized incl mutation: 7.1 us, 0 allocs/frame
 
-Zig optimized render-only:   7.6 us, 0 logical allocs/frame
-Zig optimized incl mutation: 10.7 us, 0 logical allocs/frame
+Zig optimized render-only:   6.7 us, 0 logical allocs/frame
+Zig optimized incl mutation: 9.4 us, 0 logical allocs/frame
 ```
 
 Zig's naive baseline is much faster because its allocator path does not zero

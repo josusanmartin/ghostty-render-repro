@@ -18,12 +18,11 @@ type Row struct {
 }
 
 type Screen struct {
-	Rows       []Row
-	Cols       int
-	CursorX    int
-	CursorY    int
-	Frame      uint64
-	PaletteRev uint64
+	Rows    []Row
+	Cols    int
+	CursorX int
+	CursorY int
+	Frame   uint64
 }
 
 func NewScreen(rows, cols int) *Screen {

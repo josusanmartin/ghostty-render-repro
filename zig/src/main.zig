@@ -225,12 +225,23 @@ const RenderState = struct {
     }
 
     fn deinit(self: *RenderState) void {
+        self.clearStorage();
+    }
+
+    fn clearStorage(self: *RenderState) void {
         for (self.rows) |row| {
             if (row.cells.len != 0) self.allocator.free(row.cells);
             if (row.pool.len != 0) self.allocator.free(row.pool);
         }
         if (self.rows.len != 0) self.allocator.free(self.rows);
         if (self.row_versions.len != 0) self.allocator.free(self.row_versions);
+        self.rows = &.{};
+        self.row_versions = &.{};
+        self.rows_len = 0;
+        self.cols = 0;
+        self.cursor_x = 0;
+        self.cursor_y = 0;
+        self.dirty = .false_dirty;
     }
 
     fn update(self: *RenderState, screen: *const Screen) !void {
@@ -238,15 +249,21 @@ const RenderState = struct {
         const cols = screen.cols;
         const full = self.rows_len != rows_len or self.cols != cols or self.rows.len != rows_len;
         if (full) {
-            self.deinit();
-            self.rows = try self.allocator.alloc(StateRow, rows_len);
-            self.allocation_count += 1;
-            self.row_versions = try self.allocator.alloc(u64, rows_len);
-            self.allocation_count += 1;
-            for (self.rows) |*row| row.* = .{};
-            @memset(self.row_versions, 0);
+            const replacement = blk: {
+                const new_rows = try self.allocator.alloc(StateRow, rows_len);
+                errdefer if (new_rows.len != 0) self.allocator.free(new_rows);
+                const new_versions = try self.allocator.alloc(u64, rows_len);
+                errdefer if (new_versions.len != 0) self.allocator.free(new_versions);
+                @memset(new_rows, .{});
+                @memset(new_versions, 0);
+                break :blk .{ .rows = new_rows, .versions = new_versions };
+            };
+            self.clearStorage();
+            self.rows = replacement.rows;
+            self.row_versions = replacement.versions;
             self.rows_len = rows_len;
             self.cols = cols;
+            if (rows_len != 0) self.allocation_count += 2;
         }
 
         self.cursor_x = screen.cursor_x;
@@ -264,15 +281,24 @@ const RenderState = struct {
             dst.version = src.version;
             dst.dirty = true;
             const row_cols = src.cells.len;
-            if (dst.cells.len != row_cols) {
+            const need_pool = row_cols * max_cluster_len;
+            const resized = blk: {
+                var new_cells: ?[]StateCell = null;
+                errdefer if (new_cells) |cells| if (cells.len != 0) self.allocator.free(cells);
+                var new_pool: ?[]u32 = null;
+                errdefer if (new_pool) |pool| if (pool.len != 0) self.allocator.free(pool);
+                if (dst.cells.len != row_cols) new_cells = try self.allocator.alloc(StateCell, row_cols);
+                if (dst.pool.len != need_pool) new_pool = try self.allocator.alloc(u32, need_pool);
+                break :blk .{ .cells = new_cells, .pool = new_pool };
+            };
+            if (resized.cells) |new_cells| {
                 if (dst.cells.len != 0) self.allocator.free(dst.cells);
-                dst.cells = if (row_cols == 0) &.{} else try self.allocator.alloc(StateCell, row_cols);
+                dst.cells = new_cells;
                 if (row_cols != 0) self.allocation_count += 1;
             }
-            const need_pool = row_cols * max_cluster_len;
-            if (dst.pool.len != need_pool) {
+            if (resized.pool) |new_pool| {
                 if (dst.pool.len != 0) self.allocator.free(dst.pool);
-                dst.pool = if (need_pool == 0) &.{} else try self.allocator.alloc(u32, need_pool);
+                dst.pool = new_pool;
                 if (need_pool != 0) self.allocation_count += 1;
             }
             dst.pool_len = 0;
@@ -399,6 +425,23 @@ test "optimized handles column shrink and grow" {
     for (state.rows) |row| {
         try std.testing.expectEqual(@as(usize, 9), row.cells.len);
     }
+}
+
+test "failed full resize keeps previous render state valid" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var state = RenderState.init(failing.allocator());
+    defer state.deinit();
+
+    var initial = try Screen.initWithCluster(std.testing.allocator, 4, 6, default_cluster_len);
+    defer initial.deinit();
+    try state.update(&initial);
+    const before_hash = state.hash();
+
+    var resized = try Screen.initWithCluster(std.testing.allocator, 4, 9, default_cluster_len);
+    defer resized.deinit();
+    failing.fail_index = failing.alloc_index;
+    try std.testing.expectError(error.OutOfMemory, state.update(&resized));
+    try std.testing.expectEqual(before_hash, state.hash());
 }
 
 pub fn main() !void {
